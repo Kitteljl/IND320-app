@@ -1,0 +1,5 @@
+-r requirements.txt
+jupyter
+ipykernel
+pyspark==3.5.*
+cassandra-driver
