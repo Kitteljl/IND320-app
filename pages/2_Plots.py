@@ -1,11 +1,7 @@
-"""
-IND320 - Interactive Plot page.
-"""
-
 import streamlit as st
 import matplotlib.pyplot as plt
 
-from utils import load_data, NUMERIC_COLS
+from utils import get_reservoir_area
 
 st.set_page_config(page_title="Plots", layout="wide")
 st.title("Interactive Plot")
@@ -22,7 +18,22 @@ st.markdown(
     """
 )
 
-df = load_data()
+NUMERIC_COLS = [
+    "fill_level",
+    "capacity_twh",
+    "fill_twh",
+    "fill_level_prev_week",
+    "fill_level_change",
+]
+
+a1, a2 = st.columns(2)
+area_type = a1.selectbox("Area type", ["EL", "NO", "VASS"], index=0)
+numbers = sorted(get_reservoir_area(area_type)["area_number"].unique().tolist())
+area_number = a2.selectbox(
+    "Area number", numbers, index=numbers.index(4) if 4 in numbers else 0
+)
+
+df = get_reservoir_area(area_type, area_number).copy()
 
 df["month_period"] = df["date"].dt.to_period("M")
 months = sorted(df["month_period"].unique())
@@ -87,3 +98,4 @@ ax1.grid(alpha=0.3)
 fig.autofmt_xdate()
 
 st.pyplot(fig)
+plt.close(fig)
