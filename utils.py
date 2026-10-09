@@ -41,6 +41,7 @@ def load_reservoir_data() -> pd.DataFrame:
     return df.sort_values(["area_type", "area_number", "date"]).reset_index(drop=True)
 
 
+
 def get_reservoir_area(area_type: str, area_number: int | None = None) -> pd.DataFrame:
     """Filtrer ut ett område, f.eks. ('NO', 4) eller ('EL', 4)."""
     df = load_reservoir_data()

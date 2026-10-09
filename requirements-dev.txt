@@ -3,3 +3,4 @@ jupyter
 ipykernel
 pyspark==3.5.*
 cassandra-driver
+entsoe-py

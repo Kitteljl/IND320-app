@@ -11,13 +11,26 @@ st.write(
 
 df = load_reservoir_data()
 
+# Interval slider: choose which years to display
+first_year = int(df["date"].dt.year.min())
+last_year = int(df["date"].dt.year.max())
+start_year, end_year = st.slider(
+    "Time interval (years)",
+    min_value=first_year,
+    max_value=last_year,
+    value=(max(first_year, last_year - 9), last_year),
+)
+
 area_type = st.radio(
     "Area type",
     options=["EL", "NO", "VASS"],
     horizontal=True,
 )
 
-data = df[df["area_type"] == area_type].copy()
+data = df[
+    (df["area_type"] == area_type)
+    & (df["date"].dt.year.between(start_year, end_year))
+].copy()
 data["fill_pct"] = data["fill_level"] * 100
 
 # One line per area number within the chosen type
