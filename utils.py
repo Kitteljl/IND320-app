@@ -49,3 +49,28 @@ def get_reservoir_area(area_type: str, area_number: int | None = None) -> pd.Dat
     if area_number is not None:
         df = df[df["area_number"] == area_number]
     return df.reset_index(drop=True)
+
+def reservoir_controls():
+    """Sidebar controls shared by the reservoir pages: area type and interval."""
+    df = load_reservoir_data()
+    first_year = int(df["date"].dt.year.min())
+    last_year = int(df["date"].dt.year.max())
+    with st.sidebar:
+        st.header("Reservoir data")
+        area_type = st.radio("Area type", ["EL", "NO", "VASS"], key="res_area_type")
+        start_year, end_year = st.slider(
+            "Download interval (years)",
+            min_value=first_year,
+            max_value=last_year,
+            value=(max(first_year, last_year - 9), last_year),
+            key="res_interval",
+        )
+    return area_type, start_year, end_year
+
+
+@st.cache_data(ttl=3600, show_spinner="Loading the selected interval ...")
+def download_reservoir_interval(start_year: int, end_year: int) -> pd.DataFrame:
+    """The NVE API has no date parameters, so the full series is downloaded once
+    (cached) and only the chosen interval is passed on to the pages."""
+    df = load_reservoir_data()
+    return df[df["date"].dt.year.between(start_year, end_year)].reset_index(drop=True)
