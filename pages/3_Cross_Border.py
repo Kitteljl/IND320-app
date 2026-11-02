@@ -86,31 +86,35 @@ with left:
 # ---------------- Right: line plot ----------------
 with right:
     st.subheader("Hourly flow in a month")
-    month_name = st.selectbox("Month", MONTHS, index=0)
-    month = MONTHS.index(month_name) + 1
-    df = month_data(year, month)
+    month_name = st.pills("Month", MONTHS, selection_mode="single", default="Jan")
 
-    if df.empty:
-        st.info("No data for this month.")
+    if month_name is None:
+        st.info("Select a month.")
     else:
-        options = sorted(df["series"].unique())
-        default = [s for s in options if s.startswith(link + " ")]
-        chosen = st.pills("Connections and directions", options,
-                          selection_mode="multi", default=default)
-        if not chosen:
-            st.info("Select at least one series.")
+        month = MONTHS.index(month_name) + 1
+        df = month_data(year, month)
+
+        if df.empty:
+            st.info("No data for this month.")
         else:
-            fig, ax = plt.subplots(figsize=(7, 5))
-            for name, g in df[df["series"].isin(chosen)].groupby("series"):
-                g = g.sort_values("starttime")
-                ax.plot(g["starttime"], g["flow_mw"], label=name, linewidth=1.2)
-            ax.set_ylabel("Flow (MW)")
-            ax.set_title(f"{month_name} {year}")
-            ax.grid(alpha=0.3)
-            ax.legend()
-            fig.autofmt_xdate()
-            st.pyplot(fig)
-            plt.close(fig)
+            options = sorted(df["series"].unique())
+            default = [s for s in options if s.startswith(link + " ")]
+            chosen = st.pills("Connections and directions", options,
+                              selection_mode="multi", default=default)
+            if not chosen:
+                st.info("Select at least one series.")
+            else:
+                fig, ax = plt.subplots(figsize=(7, 5))
+                for name, g in df[df["series"].isin(chosen)].groupby("series"):
+                    g = g.sort_values("starttime")
+                    ax.plot(g["starttime"], g["flow_mw"], label=name, linewidth=1.2)
+                ax.set_ylabel("Flow (MW)")
+                ax.set_title(f"{month_name} {year}")
+                ax.grid(alpha=0.3)
+                ax.legend()
+                fig.autofmt_xdate()
+                st.pyplot(fig)
+                plt.close(fig)
 
 # ---------------- Source documentation ----------------
 with st.expander("About the data"):

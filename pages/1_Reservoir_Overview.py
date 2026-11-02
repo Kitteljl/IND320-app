@@ -19,13 +19,19 @@ df = download_reservoir_interval(start_year, end_year)
 data = df[df["area_type"] == area_type].sort_values("date").copy()
 data["fill_pct"] = data["fill_level"] * 100
 
-# One row per area number, with the whole fill-level series as a mini line chart
+# First month in the selected interval (used for the mini charts)
+first_date = data["date"].min()
+first_month = data[(data["date"].dt.year == first_date.year) &
+                   (data["date"].dt.month == first_date.month)]
+FIRST_COL = f"First month ({first_date:%b %Y})"
+
 rows = []
 for number, g in data.groupby("area_number"):
+    fm = first_month[first_month["area_number"] == number]
     rows.append({
         "Area": f"{area_type}{number}",
-        "Fill level trend": g["fill_pct"].tolist(),
-        "Latest (%)": g["fill_pct"].iloc[-1],
+        FIRST_COL: fm["fill_pct"].tolist(),          # mini chart: first month only
+        "Latest (%)": g["fill_pct"].iloc[-1],         # stats: whole selected interval
         "Min (%)": g["fill_pct"].min(),
         "Max (%)": g["fill_pct"].max(),
         "Capacity (TWh)": g["capacity_twh"].iloc[-1],
@@ -38,10 +44,9 @@ else:
     st.dataframe(
         summary,
         column_config={
-            "Fill level trend": st.column_config.LineChartColumn(
-                f"Fill level {start_year}-{end_year} (%)",
-                y_min=0, y_max=100, width="large",
-            ),
+            FIRST_COL: st.column_config.LineChartColumn(
+            f"First month ({first_date:%b %Y}, %)",
+            y_min=0, y_max=100, width="large",),
             "Latest (%)": st.column_config.NumberColumn(format="%.1f"),
             "Min (%)": st.column_config.NumberColumn(format="%.1f"),
             "Max (%)": st.column_config.NumberColumn(format="%.1f"),
