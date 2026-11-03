@@ -74,3 +74,43 @@ def download_reservoir_interval(start_year: int, end_year: int) -> pd.DataFrame:
     (cached) and only the chosen interval is passed on to the pages."""
     df = load_reservoir_data()
     return df[df["date"].dt.year.between(start_year, end_year)].reset_index(drop=True)
+
+from weather import download_weather, region_id
+
+
+@st.cache_data(ttl=86400, show_spinner="Downloading weather data from Open-Meteo ...")
+def load_weather(area_type, area_number, year):
+    """Hourly ERA5 weather averaged over the sampled locations of the selected area.
+
+    Cached for 24 hours per (area type, number, year), so changing a widget back and
+    forth does not call the API again.
+    """
+    region = region_id(area_type, area_number)          # e.g. EL + 3 -> NO3, VASS + 1 -> VASS1
+    return download_weather(region, f"{year}-01-01", f"{year}-12-31")
+
+
+def weather_controls():
+    """Sidebar controls for the weather pages.
+
+    The area type (EL / NO / VASS) and the reservoir interval come from the shared
+    reservoir controls, so the weather follows the same selector as the reservoir data.
+    Area number and year are local choices. Returns (area_type, number, year, start_year, end_year).
+    """
+    area_type, start_year, end_year = reservoir_controls()
+    if area_type == "NO":
+        st.info("Weather data is available for the EL (NO1-NO5) and VASS (VASS1-VASS3) areas. "
+                "Select one of them in the sidebar.")
+        st.stop()
+    with st.sidebar:
+        st.header("Weather data")
+        number = st.selectbox("Area number", list(range(1, 6 if area_type == "EL" else 4)),
+                              key="wx_area_number")
+        year = st.selectbox("Year", list(range(2025, 1999, -1)), index=1, key="wx_year")   # default 2024
+    return area_type, number, year, start_year, end_year
+
+
+def reservoir_series(area_type, number, start_year, end_year):
+    """Weekly filling level (%) of one reservoir area in the selected interval, indexed by date."""
+    df = download_reservoir_interval(start_year, end_year)
+    one = df[(df["area_type"] == area_type) & (df["area_number"] == number)].set_index("date")
+    return (one["fill_level"] * 100).sort_index()
