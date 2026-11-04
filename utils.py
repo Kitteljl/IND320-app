@@ -5,6 +5,7 @@ Shared utilities for the IND320 Streamlit app.
 import pandas as pd
 import streamlit as st
 import requests
+import os
 
 
 
@@ -50,21 +51,20 @@ def get_reservoir_area(area_type: str, area_number: int | None = None) -> pd.Dat
         df = df[df["area_number"] == area_number]
     return df.reset_index(drop=True)
 
-def reservoir_controls():
-    """Sidebar controls shared by the reservoir pages: area type and interval."""
+def reservoir_controls(show_interval=True):
     df = load_reservoir_data()
     first_year = int(df["date"].dt.year.min())
     last_year = int(df["date"].dt.year.max())
     with st.sidebar:
         st.header("Reservoir data")
         area_type = st.radio("Area type", ["EL", "NO", "VASS"], key="res_area_type")
-        start_year, end_year = st.slider(
-            "Download interval (years)",
-            min_value=first_year,
-            max_value=last_year,
-            value=(max(first_year, last_year - 9), last_year),
-            key="res_interval",
-        )
+        if show_interval:
+            start_year, end_year = st.slider("Download interval (years)",
+                                             min_value=first_year, max_value=last_year,
+                                             value=(max(first_year, last_year - 9), last_year),
+                                             key="res_interval")
+        else:
+            start_year, end_year = first_year, last_year   # not used on the weather pages
     return area_type, start_year, end_year
 
 
@@ -79,24 +79,28 @@ from weather import download_weather, region_id
 
 
 @st.cache_data(ttl=86400, show_spinner="Downloading weather data from Open-Meteo ...")
+@st.cache_data(ttl=86400, show_spinner="Downloading weather data from Open-Meteo ...")
 def load_weather(area_type, area_number, year):
     """Hourly ERA5 weather averaged over the sampled locations of the selected area.
 
-    Cached for 24 hours per (area type, number, year), so changing a widget back and
-    forth does not call the API again.
+    Uses a pre-downloaded file in data/weather_cache/ when it exists (fast), otherwise
+    downloads from Open-Meteo (a few minutes). Cached for 24 hours per area and year.
     """
     region = region_id(area_type, area_number)          # e.g. EL + 3 -> NO3, VASS + 1 -> VASS1
-    return download_weather(region, f"{year}-01-01", f"{year}-12-31")
+    path = f"data/weather_cache/{region}_{year}.csv"
+    if os.path.exists(path):
+        return pd.read_csv(path, index_col="time", parse_dates=True)
+
+    # ERA5 is ~5 days behind, so cut the end date for the current year
+    end = min(pd.Timestamp(f"{year}-12-31"), pd.Timestamp.today().normalize() - pd.Timedelta(days=7))
+    # The pages only need temperature and precipitation, which also makes the download faster
+    return download_weather(region, f"{year}-01-01", end.strftime("%Y-%m-%d"),
+                            hourly=["temperature_2m", "precipitation"])
 
 
 def weather_controls():
-    """Sidebar controls for the weather pages.
-
-    The area type (EL / NO / VASS) and the reservoir interval come from the shared
-    reservoir controls, so the weather follows the same selector as the reservoir data.
-    Area number and year are local choices. Returns (area_type, number, year, start_year, end_year).
-    """
-    area_type, start_year, end_year = reservoir_controls()
+    
+    area_type, start_year, end_year = reservoir_controls(show_interval=False)
     if area_type == "NO":
         st.info("Weather data is available for the EL (NO1-NO5) and VASS (VASS1-VASS3) areas. "
                 "Select one of them in the sidebar.")
@@ -105,7 +109,10 @@ def weather_controls():
         st.header("Weather data")
         number = st.selectbox("Area number", list(range(1, 6 if area_type == "EL" else 4)),
                               key="wx_area_number")
-        year = st.selectbox("Year", list(range(2025, 1999, -1)), index=1, key="wx_year")   # default 2024
+               
+        years = list(range(pd.Timestamp.today().year - 1, 1999, -1))   # complete years
+        year = st.selectbox("Year", years, index=years.index(2024), key="wx_year",
+                            help="Weather is downloaded one year at a time (hourly ERA5 data).")
     return area_type, number, year, start_year, end_year
 
 

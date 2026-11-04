@@ -74,6 +74,10 @@ def download_weather(region, start, end, n_points=25, batch=5, hourly=HOURLY, ti
 
     df = pd.concat(frames)
     df["time"] = pd.to_datetime(df["time"])
+
+    if "wind_direction_10m" not in df.columns:           # e.g. only temperature + precipitation
+        return df.groupby("time").mean()
+
     # Wind direction is an angle, so average it as a vector (circular mean)
     rad = np.deg2rad(df["wind_direction_10m"])
     df["_s"], df["_c"] = np.sin(rad), np.cos(rad)
