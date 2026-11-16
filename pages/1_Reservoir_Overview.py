@@ -7,7 +7,6 @@ import streamlit as st
 
 from utils import reservoir_controls, download_reservoir_interval
 
-st.set_page_config(page_title="Reservoir overview", layout="wide")
 st.title("Reservoir overview")
 st.markdown(
     "Weekly fill level from NVE Magasinstatistikk. Choose the area type and the "

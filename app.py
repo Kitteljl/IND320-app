@@ -1,29 +1,23 @@
 import streamlit as st
+from theme import apply_plotly_theme
 
 st.set_page_config(page_title="IND320 - Reservoir Data", layout="wide")
+apply_plotly_theme()   # shared blue Plotly template for every page
 
-st.title("IND320 - Reservoir Data Project")
+pages = {
+    "": [
+        st.Page("home.py", title="Home", icon=":material/home:", default=True),
+    ],
+    "Explore": [
+        st.Page("pages/1_Reservoir_Overview.py", title="Reservoir overview", icon=":material/table_chart:"),
+        st.Page("pages/2_Reservoir_Plots.py", title="Reservoir plots", icon=":material/show_chart:"),
+        st.Page("pages/5_Cross_Border.py", title="Cross-border flows", icon=":material/swap_horiz:"),
+    ],
+    "Analyse": [
+        st.Page("pages/3_Seasonal_Analysis.py", title="Seasonal analysis", icon=":material/waves:"),
+        st.Page("pages/4_Weather_Outliers.py", title="Weather outliers", icon=":material/thunderstorm:"),
+    ],
+}
 
-st.sidebar.success("Select a page above to get started.")
-
-st.markdown("""
-Data are fetched live from the **NVE Magasinstatistikk API** (reservoir filling per area),
-hourly weather comes from **Open-Meteo** (ERA5 reanalysis), and cross-border power flows
-come from **ENTSO-E** via Cassandra/Spark, curated in **MongoDB Atlas**.
-
-### Pages
-**Reservoirs** (NVE Magasinstatistikk API)
-1. **Reservoir Overview**: table with a mini chart per area
-2. **Reservoir Plots**: filling level over time
-3. **Seasonal Analysis**: STL decomposition and spectrogram of the filling level
-
-**Weather** (Open-Meteo ERA5)
-4. **Weather Outliers**: outliers in precipitation (DCT + SPC) and anomalies in temperature (LOF)
-
-**Power flows** (ENTSO-E, Cassandra/Spark, MongoDB Atlas)
-5. **Cross Border**: yearly totals and hourly flows per connection
-
-The area type (EL / NO / VASS) and the download interval in the sidebar are shared by the
-reservoir and weather pages. The weather pages download data for the selected area on demand
-(cached), using 25 of the 1000 sampled locations in each area.
-""")
+pg = st.navigation(pages)
+pg.run()

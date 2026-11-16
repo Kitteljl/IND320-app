@@ -6,7 +6,6 @@ import streamlit as st
 
 from utils import reservoir_controls, download_reservoir_interval
 
-st.set_page_config(page_title="Reservoir plots", layout="wide")
 st.title("Reservoir plots")
 
 area_type, start_year, end_year = reservoir_controls()

@@ -14,7 +14,6 @@ COLLECTION = "cross_border"
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
-st.set_page_config(page_title="Cross-border flows", layout="wide")
 st.title("Cross-border flows (MongoDB)")
 
 

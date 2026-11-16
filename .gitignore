@@ -7,3 +7,4 @@ metastore_db/
 derby.log
 *.log
 data/entsoe_flows.csv
+cache/

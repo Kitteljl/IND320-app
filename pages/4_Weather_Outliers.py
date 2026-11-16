@@ -8,7 +8,6 @@ from analysis import plot_lof_anomalies, plot_spc_outliers
 from utils import load_weather, weather_controls
 from weather import region_id
 
-st.set_page_config(page_title="Weather outliers", layout="wide")
 st.title("Weather: outliers and anomalies")
 
 # Area type (EL/VASS) comes from the shared sidebar selector; number and year are local

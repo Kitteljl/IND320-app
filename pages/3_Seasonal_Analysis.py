@@ -7,7 +7,6 @@ import streamlit as st
 from analysis import plot_spectrogram, plot_stl
 from utils import load_reservoir_data, reservoir_controls, reservoir_series
 
-st.set_page_config(page_title="Seasonal analysis", layout="wide")
 st.title("Reservoir filling: STL and spectrogram")
 
 # Shared sidebar controls (area type EL/NO/VASS and download interval) + local area number
