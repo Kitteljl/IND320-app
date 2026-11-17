@@ -1,11 +1,19 @@
 """
 IND320 - STL decomposition and spectrogram of the reservoir filling level.
 """
-import matplotlib.pyplot as plt
 import streamlit as st
 
-from analysis import plot_spectrogram, plot_stl
-from utils import load_reservoir_data, reservoir_controls, reservoir_series
+from analysis_plotly import plot_spectrogram, plot_stl
+from utils import load_reservoir_data, reservoir_controls, reservoir_series, shared_number
+
+@st.cache_data(show_spinner="Computing the STL decomposition ...")
+def stl_fig(series, *args, **kwargs):
+    return plot_stl(series, *args, **kwargs)
+
+
+@st.cache_data(show_spinner="Computing the spectrogram ...")
+def spec_fig(series, *args, **kwargs):
+    return plot_spectrogram(series, *args, **kwargs)
 
 st.title("Reservoir filling: STL and spectrogram")
 
@@ -14,7 +22,7 @@ area_type, start_year, end_year = reservoir_controls()
 df = load_reservoir_data()
 numbers = sorted(df.loc[df["area_type"] == area_type, "area_number"].unique())
 with st.sidebar:
-    number = st.selectbox("Area number", numbers, key="seas_area_number")
+    number = shared_number("Area number", numbers, "seas_area_number", area_type)
 
 series = reservoir_series(area_type, number, start_year, end_year)
 label = f"{area_type}{number}"
@@ -36,10 +44,9 @@ with tab_stl:
                       help="Odd number, larger than 52. Larger = smoother trend.")
     robust = c3.checkbox("Robust fitting", value=True,
                          help="Reduces the influence of outliers on the fit.")
-    fig = plot_stl(series, seasonal=seasonal, trend=trend, robust=robust,
+    fig = stl_fig(series, seasonal=seasonal, trend=trend, robust=robust,
                    title=f"{label} filling level (%)")
-    st.pyplot(fig)
-    plt.close(fig)
+    st.plotly_chart(fig, width="stretch", theme=None)
 
 # ---------------- Tab 2: Spectrogram ----------------
 with tab_spec:
@@ -49,10 +56,9 @@ with tab_spec:
                        help="Longer window = sharper frequencies, poorer time resolution.")
     overlap = c2.slider("Window overlap (%)", 0, 90, 75, step=5) / 100
     fmax = c3.slider("Highest frequency shown (cycles per year)", 2, 26, 6)
-    fig = plot_spectrogram(series, window_length=window, overlap=overlap, fmax=fmax,
+    fig = spec_fig(series, window_length=window, overlap=overlap, fmax=fmax,
                            title=f"{label} filling level")
-    st.pyplot(fig)
-    plt.close(fig)
+    st.plotly_chart(fig, width="stretch", theme=None)
 
 # ---------------- Documentation ----------------
 with st.expander("About the analysis"):

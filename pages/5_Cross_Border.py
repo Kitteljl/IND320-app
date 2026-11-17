@@ -5,7 +5,8 @@ IND320 - Cross-border flows from MongoDB.
 from datetime import datetime
 
 import pandas as pd
-import matplotlib.pyplot as plt
+import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
 
 from mongo_db import get_mongo_db
@@ -35,7 +36,7 @@ def get_options():
     return links, years
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner="Reading from MongoDB ...")
 def yearly_totals(link, year):
     """Total energy (MWh) per direction for one link and year."""
     rows = collection().aggregate([
@@ -47,7 +48,7 @@ def yearly_totals(link, year):
     return {r["_id"]: r["total_mwh"] for r in rows}
 
 
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=3600, show_spinner="Reading from MongoDB ...")
 def month_data(year, month):
     """Hourly flows for all links and directions in one month."""
     start = datetime(year, month, 1)
@@ -75,12 +76,10 @@ with left:
     if sum(values) <= 0:
         st.info("No data for this selection.")
     else:
-        fig, ax = plt.subplots(figsize=(5, 5))
-        ax.pie(values, labels=["Out of Norway", "Into Norway"],
-               autopct="%1.1f%%", startangle=90)
-        ax.set_title(f"{link}, {year} (total {sum(values) / 1e3:,.0f} GWh)")
-        st.pyplot(fig)
-        plt.close(fig)
+        fig = px.pie(names=["Out of Norway", "Into Norway"], values=values, hole=0.35,
+                    title=f"{link}, {year} (total {sum(values) / 1e3:,.0f} GWh)")
+        fig.update_traces(textinfo="percent+label", rotation=90, sort=False, showlegend=False)
+        st.plotly_chart(fig, width="stretch", theme=None)
 
 # ---------------- Right: line plot ----------------
 with right:
@@ -92,6 +91,7 @@ with right:
     else:
         month = MONTHS.index(month_name) + 1
         df = month_data(year, month)
+        
 
         if df.empty:
             st.info("No data for this month.")
@@ -103,17 +103,15 @@ with right:
             if not chosen:
                 st.info("Select at least one series.")
             else:
-                fig, ax = plt.subplots(figsize=(7, 5))
+                fig = go.Figure()
                 for name, g in df[df["series"].isin(chosen)].groupby("series"):
                     g = g.sort_values("starttime")
-                    ax.plot(g["starttime"], g["flow_mw"], label=name, linewidth=1.2)
-                ax.set_ylabel("Flow (MW)")
-                ax.set_title(f"{month_name} {year}")
-                ax.grid(alpha=0.3)
-                ax.legend()
-                fig.autofmt_xdate()
-                st.pyplot(fig)
-                plt.close(fig)
+                    fig.add_scatter(x=g["starttime"], y=g["flow_mw"], mode="lines",
+                                    name=name, line=dict(width=1.5))
+                fig.update_layout(title=f"{month_name} {year}", yaxis_title="Flow (MW)",
+                                  hovermode="x unified", height=450,
+                                  legend=dict(orientation="h", y=-0.2))
+                st.plotly_chart(fig, width="stretch", theme=None)
 
 # ---------------- Source documentation ----------------
 with st.expander("About the data"):

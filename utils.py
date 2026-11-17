@@ -29,7 +29,7 @@ NVE_RENAME = {
 }
 
 
-@st.cache_data(ttl=3600, show_spinner="Henter data fra NVE ...")
+@st.cache_data(ttl=3600, show_spinner="Loading reservoir data from NVE ...")
 def load_reservoir_data() -> pd.DataFrame:
     """Alle områder (EL, NO, VASS) fra NVE Magasinstatistikk, med engelske kolonnenavn."""
     r = requests.get(NVE_URL, timeout=30)
@@ -57,7 +57,10 @@ def reservoir_controls(show_interval=True):
     last_year = int(df["date"].dt.year.max())
     with st.sidebar:
         st.header("Reservoir data")
-        area_type = st.radio("Area type", ["EL", "NO", "VASS"], key="res_area_type")
+        types = ["EL", "NO", "VASS"]
+        area_type = st.radio("Area type", types, key="res_area_type",
+                             index=types.index(st.session_state.get("sel_type", "EL")))
+        st.session_state["sel_type"] = area_type      # shared with the map and the other pages
         if show_interval:
             start_year, end_year = st.slider("Download interval (years)",
                                              min_value=first_year, max_value=last_year,
@@ -67,6 +70,16 @@ def reservoir_controls(show_interval=True):
             start_year, end_year = first_year, last_year   # not used on the weather pages
     return area_type, start_year, end_year
 
+def shared_number(label, numbers, key, area_type):
+    """Area number selector that starts from the area chosen on the map (sel_number)
+    and writes the choice back, so all pages follow the same selected area."""
+    numbers = [int(n) for n in numbers]
+    default = st.session_state.get("sel_number") if st.session_state.get("sel_type") == area_type else None
+    index = numbers.index(default) if default in numbers else 0
+    number = st.selectbox(label, numbers, index=index, key=key)
+    st.session_state["sel_number"] = int(number)
+    st.session_state["sel_type"] = area_type
+    return number
 
 @st.cache_data(ttl=3600, show_spinner="Loading the selected interval ...")
 def download_reservoir_interval(start_year: int, end_year: int) -> pd.DataFrame:
@@ -78,7 +91,7 @@ def download_reservoir_interval(start_year: int, end_year: int) -> pd.DataFrame:
 from weather import download_weather, region_id
 
 
-@st.cache_data(ttl=86400, show_spinner="Downloading weather data from Open-Meteo ...")
+
 @st.cache_data(ttl=86400, show_spinner="Downloading weather data from Open-Meteo ...")
 def load_weather(area_type, area_number, year):
     """Hourly ERA5 weather averaged over the sampled locations of the selected area.
@@ -95,7 +108,8 @@ def load_weather(area_type, area_number, year):
     end = min(pd.Timestamp(f"{year}-12-31"), pd.Timestamp.today().normalize() - pd.Timedelta(days=7))
     # The pages only need temperature and precipitation, which also makes the download faster
     return download_weather(region, f"{year}-01-01", end.strftime("%Y-%m-%d"),
-                            hourly=["temperature_2m", "precipitation"])
+                                    hourly=["temperature_2m", "precipitation", "snowfall",
+                                    "wind_speed_10m", "wind_gusts_10m"])
 
 
 def weather_controls():
@@ -107,8 +121,8 @@ def weather_controls():
         st.stop()
     with st.sidebar:
         st.header("Weather data")
-        number = st.selectbox("Area number", list(range(1, 6 if area_type == "EL" else 4)),
-                              key="wx_area_number")
+        number = shared_number("Area number", list(range(1, 6 if area_type == "EL" else 4)),
+                               "wx_area_number", area_type)
                
         years = list(range(pd.Timestamp.today().year - 1, 1999, -1))   # complete years
         year = st.selectbox("Year", years, index=years.index(2024), key="wx_year",
@@ -121,3 +135,32 @@ def reservoir_series(area_type, number, start_year, end_year):
     df = download_reservoir_interval(start_year, end_year)
     one = df[(df["area_type"] == area_type) & (df["area_number"] == number)].set_index("date")
     return (one["fill_level"] * 100).sort_index()
+# ---------------- Weekly weather for the correlation and forecast pages ----------------
+WEEKLY_PROPS = ["temperature_2m", "precipitation", "snowfall"]
+_WEEKLY_AGG = {"temperature_2m": "mean", "precipitation": "sum", "snowfall": "sum"}
+
+
+@st.cache_data(ttl=86400, show_spinner=False)
+def weather_year(area_type, number, year):
+    """Hourly ERA5 weather for one area and year (5 sampled points keeps the download fast).
+    Cached per area and year, so only missing years are downloaded."""
+    end = min(pd.Timestamp(f"{year}-12-31"), pd.Timestamp.today().normalize() - pd.Timedelta(days=7))
+    return download_weather(region_id(area_type, number), f"{year}-01-01", end.strftime("%Y-%m-%d"),
+                            n_points=5, hourly=WEEKLY_PROPS)
+
+
+def weekly_weather(area_type, number, years):
+    """Weekly weather that matches NVE's Sunday dates (Oslo local weeks ending on Sunday),
+    with a progress bar while the years are downloaded."""
+    bar = st.progress(0.0, text="Downloading weather ...")
+    parts = []
+    for i, yr in enumerate(years):
+        bar.progress(i / len(years), text=f"Downloading weather for {yr} ({i + 1}/{len(years)}) ...")
+        parts.append(weather_year(area_type, number, yr))
+    bar.empty()
+    hourly = pd.concat(parts)
+    hourly.index = pd.to_datetime(hourly.index).tz_localize("UTC").tz_convert("Europe/Oslo")
+    daily = hourly.resample("D").agg(_WEEKLY_AGG)
+    weekly = daily.resample("W-SUN").agg(_WEEKLY_AGG)
+    weekly.index = weekly.index.tz_localize(None).normalize()
+    return weekly.iloc[1:-1]            # drop the incomplete first and last week
