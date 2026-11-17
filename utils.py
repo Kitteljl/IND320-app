@@ -51,6 +51,13 @@ def get_reservoir_area(area_type: str, area_number: int | None = None) -> pd.Dat
         df = df[df["area_number"] == area_number]
     return df.reset_index(drop=True)
 
+# Icons and names for the area types (shown in the shared sidebar selector)
+AREA_LABELS = {
+    "EL": ":material/bolt: EL · Price areas",
+    "NO": ":material/flag: NO · Norway",
+    "VASS": ":material/water_drop: VASS · Water areas",
+}
+
 def reservoir_controls(show_interval=True):
     df = load_reservoir_data()
     first_year = int(df["date"].dt.year.min())
@@ -59,7 +66,8 @@ def reservoir_controls(show_interval=True):
         st.header("Reservoir data")
         types = ["EL", "NO", "VASS"]
         area_type = st.radio("Area type", types, key="res_area_type",
-                             index=types.index(st.session_state.get("sel_type", "EL")))
+                             index=types.index(st.session_state.get("sel_type", "EL")),
+                             format_func=lambda t: AREA_LABELS[t])
         st.session_state["sel_type"] = area_type      # shared with the map and the other pages
         if show_interval:
             start_year, end_year = st.slider("Download interval (years)",

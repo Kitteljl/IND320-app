@@ -1,8 +1,10 @@
 import streamlit as st
 from theme import apply_plotly_theme
 
-st.set_page_config(page_title="IND320 - Reservoir Data", layout="wide")
+st.set_page_config(page_title="IND320 - Reservoir Data", layout="wide",
+                   page_icon="images/fish_transparent.png")
 apply_plotly_theme()   # shared blue Plotly template for every page
+st.logo("images/fish_transparent.png")
 
 pages = {
     "": [
@@ -18,7 +20,7 @@ pages = {
         st.Page("pages/3_Seasonal_Analysis.py", title="Seasonal analysis", icon=":material/waves:"),
         st.Page("pages/4_Weather_Outliers.py", title="Weather outliers", icon=":material/thunderstorm:"),
     ],
-        "Predict": [
+    "Predict": [
         st.Page("pages/7_Correlation.py", title="Sliding window correlation", icon=":material/insights:"),
         st.Page("pages/8_Forecast.py", title="Forecast", icon=":material/trending_up:"),
     ],
