@@ -21,28 +21,33 @@ def _climatology(exog):
 
 
 def forecast_filling(y, horizon=12, history_weeks=104, p=1, d=1, q=1,
-                     fourier_k=2, lr=0.01, exog=None):
+                     fourier_k=2, lr=0.01, exog=None, persist=()):
     """Forecast weekly reservoir filling with River's SNARIMAX.
 
-    y             : pandas Series, weekly Sunday dates as index (filling degree)
+    y             : pandas Series, weekly Sunday dates as index (filling degree, 0-1)
     horizon       : number of weeks ahead to predict
     history_weeks : how many of the most recent weeks the model learns from
     p, d, q       : AR order, differencing, MA order
     fourier_k     : yearly harmonics used as exogenous features (0 = none)
     lr            : SGD learning rate of the underlying linear regressor
-    exog          : optional DataFrame of weekly features (e.g. temperature, precipitation),
-                    indexed by the same Sunday dates. Only rows up to the last date of y are used.
-                    For the forecast weeks the average value of that ISO week is used (unknown future).
+    exog          : optional DataFrame of weekly inputs from any data source (weather, exchange
+                    rates, ...), indexed by the same Sunday dates. This is the selection of data
+                    sources: the model uses exactly the columns that are passed in. Only rows up
+                    to the last date of y are used, so nothing from the future leaks in.
+    persist       : names of exog columns without a yearly pattern (for example exchange rates).
+                    For the forecast weeks they keep their last known value; all other columns
+                    use the average of that week of the year (calculated from past data only).
     Returns a Series of forecasts indexed by the future weekly dates.
     """
     y = y.dropna().sort_index().iloc[-history_weeks:]
     last_date = y.index[-1]
 
-    cols, clim = None, None
+    cols, clim, last_vals = None, None, {}
     if exog is not None and exog.shape[1] > 0:
         exog = exog.sort_index().loc[:last_date]      # never look past the forecast origin
         cols = list(exog.columns)
         clim = _climatology(exog)
+        last_vals = {c: float(exog[c].dropna().iloc[-1]) for c in cols}
 
     def features(date, known):
         x = _fourier(date, fourier_k) if fourier_k > 0 else {}
@@ -52,7 +57,8 @@ def forecast_filling(y, horizon=12, history_weeks=104, p=1, d=1, q=1,
             else:
                 wk = int(date.isocalendar().week)
                 wk = wk if wk in clim.index else 52     # week 53 falls back to week 52
-                x.update(clim.loc[wk, cols].to_dict())
+                for c in cols:
+                    x[c] = last_vals[c] if c in persist else float(clim.loc[wk, c])
         return x or None
 
     model = time_series.SNARIMAX(

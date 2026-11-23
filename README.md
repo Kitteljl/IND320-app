@@ -4,7 +4,7 @@ Streamlit app and notebooks for the IND320 project work (NMBU). The app combines
 filling, hourly weather and cross-border power flows, and adds anomaly detection, correlation analysis
 and a short-term forecast of reservoir filling.
 
-- **Streamlit app:** https://YOUR-APP.streamlit.app/
+- **Streamlit app:** https://ind320-app-kittel.streamlit.app/
 - **Notebooks:** `notebooks/IND320_part1.ipynb` to `IND320_part4.ipynb` (development, documentation, log)
 
 ## Data sources

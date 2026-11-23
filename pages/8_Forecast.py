@@ -11,16 +11,16 @@ from analysis_plotly import WEATHER_PROPS
 from forecasting import forecast_filling
 from theme import COLORWAY
 from utils import (WEEKLY_PROPS, load_reservoir_data, reservoir_controls, reservoir_series,
-                   shared_number, weekly_weather)
+                   shared_number, weekly_exchange_rates, weekly_weather)
 
 st.title("Forecast of reservoir filling")
 
 
 @st.cache_data(show_spinner=False)
-def run_forecast(y, exog, horizon, history_weeks, p, d, q, fourier_k, lr):
+def run_forecast(y, exog, persist, horizon, history_weeks, p, d, q, fourier_k, lr):
     """Cached forecast: the same settings are never computed twice."""
     return forecast_filling(y, horizon=horizon, history_weeks=history_weeks, p=p, d=d, q=q,
-                            fourier_k=fourier_k, lr=lr, exog=exog)
+                            fourier_k=fourier_k, lr=lr, exog=exog, persist=persist)
 
 
 # ---------------- Shared area selection (sidebar) ----------------
@@ -51,12 +51,19 @@ st.session_state["sel_date"] = train_end
 horizon = c2.slider("Forecast horizon (weeks)", 4, 26, 12)
 history_weeks = c3.slider("History used (weeks)", 26, 520, 104)
 
+# Data sources that can be selected: label -> (source, column)
+SOURCES = {
+    "Weather: temperature": ("weather", "temperature_2m"),
+    "Weather: precipitation": ("weather", "precipitation"),
+    "Weather: snowfall": ("weather", "snowfall"),
+    "Exchange rate: EUR/NOK": ("fx", "NOK_per_EUR"),
+    "Exchange rate: USD/NOK": ("fx", "NOK_per_USD"),
+}
+options = [s for s, (kind, _) in SOURCES.items() if not (kind == "weather" and area_type == "NO")]
 if area_type == "NO":
-    exog_props = []
     st.caption("Weather inputs are available for the EL and VASS areas.")
-else:
-    exog_props = st.multiselect("Weather inputs (exogenous variables)", WEEKLY_PROPS, default=["temperature_2m"],
-                                format_func=lambda p_: WEATHER_PROPS[p_][0])
+chosen = st.multiselect("Data sources (exogenous variables)", options,
+                        default=["Weather: temperature"] if area_type != "NO" else [])
 
 with st.expander("Model settings (SNARIMAX)"):
     m1, m2, m3, m4, m5 = st.columns(5)
@@ -71,14 +78,19 @@ with st.expander("Model settings (SNARIMAX)"):
 y_train = y.loc[:train_end]
 try:
     with st.status("Running the forecast ...", expanded=True) as status:
-        exog = None
-        if exog_props:
+        years = list(range(train_end.year - 8, train_end.year + 1))   # 8 years for the weekly averages
+        w_cols = [SOURCES[s][1] for s in chosen if SOURCES[s][0] == "weather"]
+        f_cols = [SOURCES[s][1] for s in chosen if SOURCES[s][0] == "fx"]
+        parts = []
+        if w_cols:
             st.write("Getting weather data ...")
-            years = list(range(train_end.year - 8, train_end.year + 1))   # 8 years for the weekly averages
-            exog = weekly_weather(area_type, number, years)[exog_props]
+            parts.append(weekly_weather(area_type, number, years)[w_cols])
+        if f_cols:
+            st.write("Getting exchange rates ...")
+            parts.append(weekly_exchange_rates(years[0], years[-1])[f_cols])
+        exog = pd.concat(parts, axis=1) if parts else None
         st.write("Training the model and forecasting ...")
-        fc_raw = run_forecast(y_train, exog, horizon, history_weeks, p, d, q, fourier_k, lr)
-        status.update(label="Forecast ready", state="complete", expanded=False)
+        fc_raw = run_forecast(y_train, exog, tuple(f_cols), horizon, history_weeks, p, d, q, fourier_k, lr)
 except Exception as e:
     st.error(f"The forecast could not be computed ({type(e).__name__}: {e}). "
              "Try other settings or try again in a few minutes.")

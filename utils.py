@@ -97,6 +97,7 @@ def download_reservoir_interval(start_year: int, end_year: int) -> pd.DataFrame:
     return df[df["date"].dt.year.between(start_year, end_year)].reset_index(drop=True)
 
 from weather import download_weather, region_id
+from exchange_rates import download_exchange_rates
 
 
 
@@ -172,3 +173,14 @@ def weekly_weather(area_type, number, years):
     weekly = daily.resample("W-SUN").agg(_WEEKLY_AGG)
     weekly.index = weekly.index.tz_localize(None).normalize()
     return weekly.iloc[1:-1]            # drop the incomplete first and last week
+
+@st.cache_data(ttl=86400, show_spinner="Downloading exchange rates from Norges Bank ...")
+def weekly_exchange_rates(start_year, end_year):
+    """Weekly mean of the daily NOK rates (EUR and USD), on NVE's Sunday dates.
+    The rates exist only on business days, so each calendar day first uses the last
+    published rate (forward-fill), as in section 3.2 of the notebook."""
+    fx = download_exchange_rates(f"{start_year}-01-01", f"{end_year}-12-31")
+    daily = fx.reindex(pd.date_range(fx.index.min(), fx.index.max(), freq="D")).ffill()
+    weekly = daily.resample("W-SUN").mean()
+    weekly.index = weekly.index.normalize()
+    return weekly
